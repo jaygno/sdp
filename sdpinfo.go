@@ -306,7 +306,9 @@ func (s *SDPInfo) String() string {
 
 		mediaMap.Mid = media.GetID()
 
-		bundleMids = append(bundleMids, media.GetID())
+        if (media.GetDirection() != INACTIVE) {
+            bundleMids = append(bundleMids, media.GetID())
+        }
 
 		if media.GetBitrate() > 0 {
 			mediaMap.Bandwidth = append(mediaMap.Bandwidth, &transform.BandwithStruct{
@@ -762,21 +764,23 @@ func Parse(sdp string) (*SDPInfo, error) {
 
 		sdpInfo.SetICE(NewICEInfo(ufrag, pwd))
 
-		for _, candiate := range md.Candidates {
+        if md.Candidates != nil {
+			for _, candiate := range md.Candidates {
 
-			candidateInfo := NewCandidateInfo(
-				candiate.Foundation,
-				candiate.Component,
-				candiate.Transport,
-				candiate.Priority,
-				candiate.Ip,
-				candiate.Port,
-				candiate.Type,
-				candiate.Raddr,
-				candiate.Rport)
+				candidateInfo := NewCandidateInfo(
+					candiate.Foundation,
+					candiate.Component,
+					candiate.Transport,
+					candiate.Priority,
+					candiate.Ip,
+					candiate.Port,
+					candiate.Type,
+					candiate.Raddr,
+					candiate.Rport)
 
-			sdpInfo.AddCandidate(candidateInfo)
-		}
+				sdpInfo.AddCandidate(candidateInfo)
+			}
+        }
 
 		var fingerpirnt *transform.FingerprintStruct
 
@@ -788,16 +792,17 @@ func Parse(sdp string) (*SDPInfo, error) {
 			fingerpirnt = md.Fingerprint
 		}
 
-		remoteHash := fingerpirnt.Type
-		remoteFingerprint := fingerpirnt.Hash
 
 		setup := SETUPACTPASS
 
-		if md.Setup != "" {
+		if md.Setup != ""  && md.Fingerprint != nil{
+			fingerpirnt = md.Fingerprint
+			remoteHash := fingerpirnt.Type
+			remoteFingerprint := fingerpirnt.Hash
 			setup = SetupByValue(md.Setup)
+			sdpInfo.SetDTLS(NewDTLSInfo(setup, remoteHash, remoteFingerprint))
 		}
 
-		sdpInfo.SetDTLS(NewDTLSInfo(setup, remoteHash, remoteFingerprint))
 
 		direction := SENDRECV
 
@@ -809,43 +814,45 @@ func Parse(sdp string) (*SDPInfo, error) {
 
 		apts := map[int]int{}
 
-		for _, fmt := range md.Rtp {
+        if md.Rtp != nil {
+			for _, fmt := range md.Rtp {
 
-			payload := fmt.Payload
-			codec := fmt.Codec
+				payload := fmt.Payload
+				codec := fmt.Codec
 
-			if "RED" == strings.ToUpper(codec) || "ULPFEC" == strings.ToUpper(codec) {
-				continue
-			}
+				if "RED" == strings.ToUpper(codec) || "ULPFEC" == strings.ToUpper(codec) {
+					continue
+				}
 
-			params := map[string]string{}
+				params := map[string]string{}
 
-			for _, fmtp := range md.Fmtp {
+				for _, fmtp := range md.Fmtp {
 
-				if fmtp.Payload == payload {
-					list := strings.Split(fmtp.Config, ";")
+					if fmtp.Payload == payload {
+						list := strings.Split(fmtp.Config, ";")
 
-					for _, kv := range list {
-						param := strings.Split(kv, "=")
-						if len(param) < 2 {
-							continue
+						for _, kv := range list {
+							param := strings.Split(kv, "=")
+							if len(param) < 2 {
+								continue
+							}
+							params[param[0]] = param[1]
 						}
-						params[param[0]] = param[1]
 					}
 				}
-			}
 
-			if "RTX" == strings.ToUpper(codec) {
-				if apt, ok := params["apt"]; ok {
-					aptint, _ := strconv.Atoi(apt)
-					apts[aptint] = payload
+				if "RTX" == strings.ToUpper(codec) {
+					if apt, ok := params["apt"]; ok {
+						aptint, _ := strconv.Atoi(apt)
+						apts[aptint] = payload
+					}
+				} else {
+					codecInfo := NewCodecInfo(codec, payload)
+					codecInfo.AddParams(params)
+					mediaInfo.AddCodec(codecInfo)
 				}
-			} else {
-				codecInfo := NewCodecInfo(codec, payload)
-				codecInfo.AddParams(params)
-				mediaInfo.AddCodec(codecInfo)
 			}
-		}
+        }
 
 		// rtx
 		for pt1, pt2 := range apts {
@@ -871,32 +878,36 @@ func Parse(sdp string) (*SDPInfo, error) {
 		}
 
 		// extmap
-		for _, extmap := range md.Ext {
-			mediaInfo.AddExtension(extmap.Value, extmap.Uri)
-		}
-
-		for _, rid := range md.Rids {
-			direction := DirectionWaybyValue(rid.Direction)
-			ridInfo := NewRIDInfo(rid.Id, direction)
-
-			formats := []string{}
-			params := map[string]string{}
-
-			if rid.Params != "" {
-				list := transform.ParseParams(rid.Params)
-				for k, v := range list {
-					if k == "pt" {
-						formats = strings.Split(v, ",")
-					} else {
-						params[k] = v
-					}
-				}
-				ridInfo.SetFormats(formats)
-				ridInfo.SetParams(params)
+        if md.Ext != nil {
+			for _, extmap := range md.Ext {
+				mediaInfo.AddExtension(extmap.Value, extmap.Uri)
 			}
+        }
 
-			mediaInfo.AddRID(ridInfo)
-		}
+        if md.Rids != nil {
+			for _, rid := range md.Rids {
+				direction := DirectionWaybyValue(rid.Direction)
+				ridInfo := NewRIDInfo(rid.Id, direction)
+
+				formats := []string{}
+				params := map[string]string{}
+
+				if rid.Params != "" {
+					list := transform.ParseParams(rid.Params)
+					for k, v := range list {
+						if k == "pt" {
+							formats = strings.Split(v, ",")
+						} else {
+							params[k] = v
+						}
+					}
+					ridInfo.SetFormats(formats)
+					ridInfo.SetParams(params)
+				}
+
+				mediaInfo.AddRID(ridInfo)
+			}
+        }
 
 		encodings := [][]*TrackEncodingInfo{}
 
