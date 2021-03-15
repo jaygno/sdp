@@ -306,9 +306,9 @@ func (s *SDPInfo) String() string {
 
 		mediaMap.Mid = media.GetID()
 
-        if (media.GetDirection() != INACTIVE) {
-            bundleMids = append(bundleMids, media.GetID())
-        }
+		if (media.GetDirection() != INACTIVE) {
+		    bundleMids = append(bundleMids, media.GetID())
+		}
 
 		if media.GetBitrate() > 0 {
 			mediaMap.Bandwidth = append(mediaMap.Bandwidth, &transform.BandwithStruct{
@@ -764,7 +764,7 @@ func Parse(sdp string) (*SDPInfo, error) {
 
 		sdpInfo.SetICE(NewICEInfo(ufrag, pwd))
 
-        if md.Candidates != nil {
+		if md.Candidates != nil {
 			for _, candiate := range md.Candidates {
 
 				candidateInfo := NewCandidateInfo(
@@ -780,7 +780,7 @@ func Parse(sdp string) (*SDPInfo, error) {
 
 				sdpInfo.AddCandidate(candidateInfo)
 			}
-        }
+		}
 
 		var fingerpirnt *transform.FingerprintStruct
 
@@ -814,7 +814,7 @@ func Parse(sdp string) (*SDPInfo, error) {
 
 		apts := map[int]int{}
 
-        if md.Rtp != nil {
+		if md.Rtp != nil {
 			for _, fmt := range md.Rtp {
 
 				payload := fmt.Payload
@@ -852,7 +852,7 @@ func Parse(sdp string) (*SDPInfo, error) {
 					mediaInfo.AddCodec(codecInfo)
 				}
 			}
-        }
+		}
 
 		// rtx
 		for pt1, pt2 := range apts {
@@ -878,13 +878,13 @@ func Parse(sdp string) (*SDPInfo, error) {
 		}
 
 		// extmap
-        if md.Ext != nil {
+		if md.Ext != nil {
 			for _, extmap := range md.Ext {
 				mediaInfo.AddExtension(extmap.Value, extmap.Uri)
 			}
-        }
+		}
 
-        if md.Rids != nil {
+		if md.Rids != nil {
 			for _, rid := range md.Rids {
 				direction := DirectionWaybyValue(rid.Direction)
 				ridInfo := NewRIDInfo(rid.Id, direction)
@@ -907,7 +907,7 @@ func Parse(sdp string) (*SDPInfo, error) {
 
 				mediaInfo.AddRID(ridInfo)
 			}
-        }
+		}
 
 		encodings := [][]*TrackEncodingInfo{}
 
